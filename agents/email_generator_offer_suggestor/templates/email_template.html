@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ subject }}</title>
+</head>
+<body>
+    <img src="http://localhost:8002/track-open?user_id={{ user_id }}&email={{ email }}" width="1" height="1" style="display:none;" />
+    <h1>Hi {{ name or 'Valued Customer' }},</h1>
+    <p>We noticed you left some items in your cart:</p>
+    <ul>
+        {% for item in items %}
+        <li>{{ item.name }} - ${{ item.price }} x {{ item.quantity }}</li>
+        {% endfor %}
+    </ul>
+    <p>Don't miss out! Here are some recommendations:</p>
+    <ul>
+        {% for rec in recommendations %}
+        <li>{{ rec.name }} - ${{ rec.price }}</li>
+        {% endfor %}
+    </ul>
+    <p>Special offers just for you:</p>
+    <ul>
+        {% for offer in offers %}
+        <li>{{ offer.description }}</li>
+        {% endfor %}
+    </ul>
+    <p>{{ body }}</p>
+    <a href="http://localhost:8002/track-click?user_id={{ user_id }}&email={{ email }}">Complete Your Purchase</a>
+</body>
+</html>

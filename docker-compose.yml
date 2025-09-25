@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  detector:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.detector
+    ports:
+      - "8001:8001"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - API_TOKEN=${API_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
+
+  email_generator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.email
+    ports:
+      - "8002:8002"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - API_TOKEN=${API_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
