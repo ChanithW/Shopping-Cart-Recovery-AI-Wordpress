@@ -1,6 +1,6 @@
 <?php
 function scr_call_detector_api($cart_data) {
-    $api_url = 'http://localhost:8001/detect-abandonment';  // Correct port for abandonment detector
+    $api_url = 'http://localhost:8004/detect-abandonment';  // Updated port
     $token = get_option('scr_api_token', 'd405b55571c2b2471760c4ccfc6a62a9d8e8ee5e15a3cccd6a576cf69939f379');  // Fallback token
 
     error_log('SCR: Making API call to: ' . $api_url);
