@@ -24,8 +24,12 @@ The system is built with a microservices architecture:
   - Logs recovery data to WordPress database for analytics.
 
 - **Python Agents** (`agents/`):
-  - **Abandonment Detector** (`agents/abandonment_detector/`): FastAPI service that analyzes cart data and user behavior to detect abandonment.
-  - **Email Generator & Offer Suggestor** (`agents/email_generator_offer_suggestor/`): FastAPI service that creates personalized emails with AI-generated offers and recommendations.
+  - **Abandonment Detector Agent** (`agents/abandonment_detector/`):
+    - Analyzes user behavior data (e.g., cart items, idle time, session duration) to determine if a shopping cart is likely abandoned.
+    - Uses AI algorithms to predict abandonment based on patterns, triggering recovery actions.
+  - **Email Generator & Offer Suggestor Agent** (`agents/email_generator_offer_suggestor/`):
+    - Generates personalized recovery emails with tailored offers and recommendations using Large Language Models (LLMs) like Google Gemini.
+    - Incorporates Natural Language Processing (NLP) to create context-aware, engaging content based on user data and personas.
 
 - **Shared Utilities** (`agents/shared/`):
   - `gemini_client.py`: Interface for Google Gemini AI API for content generation.
