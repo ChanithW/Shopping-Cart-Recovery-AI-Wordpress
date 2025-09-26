@@ -36,6 +36,20 @@ The system is built with a microservices architecture:
   - `docker-compose.yml`: Orchestrates all services.
   - `Dockerfile.detector` and `Dockerfile.email`: Build files for agent containers.
 
+### AI and NLP Integration
+
+- **Large Language Models (LLMs)**:
+  - Uses Google Gemini AI for personalized email content generation (subject lines, body text, offers).
+  - Processes user data (cart items, behavior) to tailor messages based on personas.
+  - Integrated via `gemini_client.py` wrapper for API handling.
+
+- **Natural Language Processing (NLP)**:
+  - Analyzes user behavior and product descriptions for personalization (e.g., keyword extraction, recommendations).
+  - Crafts context-aware emails with semantic similarity and tone adjustment.
+  - Supports potential multilingual generation.
+
+- **AI Workflow**: Data collection → LLM processing → NLP refinement → Email generation.
+
 ### Data Flow
 
 1. User browses WooCommerce site → JavaScript tracks behavior.
