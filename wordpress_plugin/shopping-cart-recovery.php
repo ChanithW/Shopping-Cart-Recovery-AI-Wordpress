@@ -19,6 +19,7 @@ require_once SCR_PLUGIN_DIR . 'admin/analytics.php';
 // Hooks
 add_action('woocommerce_add_to_cart', 'scr_track_cart');
 add_action('woocommerce_cart_updated', 'scr_check_abandonment');
+add_action('wp', 'scr_periodic_abandonment_check');
 add_action('admin_menu', 'scr_admin_menu');
 
 // Enqueue scripts

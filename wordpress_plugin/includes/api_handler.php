@@ -1,6 +1,6 @@
 <?php
 function scr_call_detector_api($cart_data) {
-    $api_url = 'http://localhost:8001/detect-abandonment';  // Correct port for abandonment detector
+    $api_url = 'http://localhost:8005/detect-abandonment';  // Correct port for abandonment detector
     $token = get_option('scr_api_token', 'd405b55571c2b2471760c4ccfc6a62a9d8e8ee5e15a3cccd6a576cf69939f379');  // Fallback token
 
     error_log('SCR: Making API call to: ' . $api_url);
@@ -260,5 +260,18 @@ function scr_update_behavior_handler() {
     ), 3600); // 1 hour
 
     wp_die();
+}
+
+function scr_periodic_abandonment_check() {
+    if (!is_admin() && !wp_doing_ajax() && function_exists('WC') && WC()->cart) {
+        $cart = WC()->cart->get_cart();
+        if (!empty($cart)) {
+            $user_id = get_current_user_id() ?: session_id();
+            $last_check = get_transient('scr_last_check_' . $user_id);
+            if (!$last_check || (time() - $last_check) > 600) { // Check every 10 minutes
+                scr_check_abandonment();
+            }
+        }
+    }
 }
 ?>
