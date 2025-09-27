@@ -52,7 +52,7 @@ The system is built with a microservices architecture:
   - Crafts context-aware emails with semantic similarity and tone adjustment.
   - Supports potential multilingual generation.
 
-- **AI Workflow**: Data collection → LLM processing → NLP refinement → Email generation.
+- **AI Workflow**: Data collection → NLP/LLM preprocessing → NLP refinement → Email generation.
 
 ### Data Flow
 
