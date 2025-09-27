@@ -256,6 +256,15 @@ curl -X POST http://localhost:8005/detect-abandonment \
 - **Rate Limiting**: Implemented on API endpoints to prevent abuse
 - **HTTPS**: Always use secure connections in production
 
+### Responsible AI Check Features in the System
+
+- **Minimal Data Collection**: Only necessary data (e.g., cart items, behavior) is collected.
+- **Data Encryption**: Sensitive data is encrypted in transit (HTTPS) and at rest, preventing unauthorized access.
+- **Personalization Without Discrimination**: AI-generated emails are tailored based on user behaviour.
+- **Harmful Content Prevention**: NLP in Gemini filters out inappropriate language; the system generates professional, conversion-focused emails only.
+- **Input Validation**: Sanitized inputs prevent biased or harmful prompts from generating discriminatory content.
+- **Personalization Without Discrimination**: AI-generated emails are tailored based on user behavior and personas (e.g., "loyal customer"), but the system avoids using sensitive attributes (e.g., race, gender) that could introduce bias.
+
 ### Performance Tuning
 
 - Adjust abandonment check intervals in `api_handler.php`
