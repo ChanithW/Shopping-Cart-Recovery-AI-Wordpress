@@ -52,7 +52,7 @@ The system is built with a microservices architecture:
   - Crafts context-aware emails with semantic similarity and tone adjustment.
   - Supports potential multilingual generation.
 
-- **AI Workflow**: Data collection → NLP/LLM preprocessing → NLP refinement → Email generation.
+- **AI Workflow**: Data collection → NLP/ML preprocessing → LLM  → Email generation.
 
 ### Data Flow
 
@@ -255,20 +255,6 @@ curl -X POST http://localhost:8005/detect-abandonment \
 - **Input Validation**: All inputs sanitized to prevent injection attacks
 - **Rate Limiting**: Implemented on API endpoints to prevent abuse
 - **HTTPS**: Always use secure connections in production
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Agents Not Starting**: Check Python version and dependencies
-2. **API Connection Failed**: Verify ports and firewall settings
-3. **Emails Not Sending**: Check email configuration in WordPress
-4. **Database Errors**: Ensure WordPress DB permissions
-
-### Logs
-
-- WordPress: `wp-content/debug.log`
-- Agents: Console output or configure logging to files
 
 ### Performance Tuning
 
