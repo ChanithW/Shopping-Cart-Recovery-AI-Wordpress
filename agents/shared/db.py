@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Enum, DECIMAL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -25,6 +25,19 @@ class CartLog(Base):
     opened = Column(Integer, default=0)
     clicked = Column(Integer, default=0)
     converted = Column(Integer, default=0)
+
+class Product(Base):
+    __tablename__ = 'products'
+    
+    id = Column(Integer, primary_key=True)
+    item_name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    price = Column(DECIMAL(10, 2), nullable=False)
+    category = Column(String(100), nullable=False)
+    stock_status = Column(Enum('in_stock', 'out_of_stock'), default='in_stock')
+    stock_quantity = Column(Integer, default=0)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
 
 def get_db_session():
     return SessionLocal()

@@ -1,6 +1,6 @@
 <?php
 function scr_call_detector_api($cart_data) {
-    $api_url = 'http://localhost:8005/detect-abandonment';  // Correct port for abandonment detector
+    $api_url = 'http://localhost:8006/detect-abandonment';  // Correct port for abandonment detector
     $token = get_option('scr_api_token', 'd405b55571c2b2471760c4ccfc6a62a9d8e8ee5e15a3cccd6a576cf69939f379');  // Fallback token
 
     error_log('SCR: Making API call to: ' . $api_url);
@@ -124,18 +124,13 @@ function scr_check_abandonment() {
 
     error_log('SCR: User ID: ' . $user_id . ', Email: ' . $email);
 
+    // Enrich cart data with product information from our enhanced database
+    $enriched_items = scr_enrich_cart_data($cart);
+    
     $cart_data = array(
         'user_id' => (string) $user_id,  // Convert to string as expected by API
         'email' => $email,
-        'items' => array_values(array_map(function($item) {  // Convert associative array to numeric array
-            $product = $item['data'];
-            return array(
-                'product_id' => (int) $item['product_id'],
-                'name' => method_exists($product, 'get_name') ? $product->get_name() : ($item['name'] ?? 'Unknown Product'),
-                'price' => method_exists($product, 'get_price') ? (float) $product->get_price() : (float) ($item['line_total'] ?? $item['price'] ?? 0),
-                'quantity' => (int) $item['quantity']
-            );
-        }, $cart)),
+        'items' => $enriched_items,
         'timestamp' => (float) time(),
         'behavior' => array_map(function($value) {
             return (int) $value;
@@ -150,10 +145,11 @@ function scr_check_abandonment() {
     if ($result && isset($result['abandoned']) && $result['abandoned']) {
         error_log('SCR: Cart abandoned, calling email API');
 
-        // Check if email already sent for this user/cart session (prevent duplicates)
-        $email_sent_key = 'scr_email_sent_' . $user_id . '_' . md5(serialize($cart));
-        if (get_transient($email_sent_key)) {
-            error_log('SCR: Email already sent for this cart session, skipping');
+        // Check if email already sent for this user recently (prevent spam but allow testing)
+        $email_sent_key = 'scr_email_sent_' . $user_id;
+        $last_sent = get_transient($email_sent_key);
+        if ($last_sent && (time() - $last_sent < 1800)) { // 30 minutes cooldown
+            error_log('SCR: Email already sent recently for this user, skipping (cooldown: ' . (1800 - (time() - $last_sent)) . ' seconds)');
             return;
         }
 
@@ -177,7 +173,7 @@ function scr_check_abandonment() {
 
         // Mark email as sent (expires in 24 hours)
         if ($email_result && !isset($email_result['detail'])) {
-            set_transient($email_sent_key, true, 86400); // 24 hours
+            set_transient($email_sent_key, time(), 1800); // 30 minutes
             error_log('SCR: Email sent successfully, marked as sent');
 
             // Log to database for analytics
