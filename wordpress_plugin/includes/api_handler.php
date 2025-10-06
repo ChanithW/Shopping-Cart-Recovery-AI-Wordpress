@@ -93,6 +93,17 @@ function scr_check_abandonment() {
         error_log('SCR: Generated fallback user_id: ' . $user_id);
     }
 
+    // Create a cart signature to prevent duplicate processing
+    $cart_signature = md5(json_encode($cart_data));
+    $cart_check_key = 'scr_cart_check_' . $user_id . '_' . $cart_signature;
+    
+    // Check if we already processed this exact cart state recently
+    if (get_transient($cart_check_key)) {
+        error_log('SCR: Same cart state already processed recently, skipping');
+        return;
+    }
+    set_transient($cart_check_key, time(), 300); // 5 minutes
+
     // Check if we already checked recently (prevent too frequent calls)
     $last_check = get_transient('scr_last_check_' . $user_id);
     if ($last_check && (time() - $last_check) < 30) { // Only check every 30 seconds
@@ -142,7 +153,28 @@ function scr_check_abandonment() {
     $result = scr_call_detector_api($cart_data);
     error_log('SCR: API call result: ' . print_r($result, true));
 
-    if ($result && isset($result['abandoned']) && $result['abandoned']) {
+    // Debug the condition check
+    error_log('SCR: DEBUG - result exists: ' . (isset($result) ? 'yes' : 'no'));
+    error_log('SCR: DEBUG - result is not null: ' . (!is_null($result) ? 'yes' : 'no'));
+    error_log('SCR: DEBUG - result is not empty: ' . (!empty($result) ? 'yes' : 'no'));
+    error_log('SCR: DEBUG - abandoned key exists: ' . (isset($result['abandoned']) ? 'yes' : 'no'));
+    if (isset($result['abandoned'])) {
+        error_log('SCR: DEBUG - abandoned value: ' . $result['abandoned'] . ' (type: ' . gettype($result['abandoned']) . ')');
+        error_log('SCR: DEBUG - abandoned truthy check: ' . ($result['abandoned'] ? 'true' : 'false'));
+        error_log('SCR: DEBUG - abandoned === true: ' . ($result['abandoned'] === true ? 'yes' : 'no'));
+        error_log('SCR: DEBUG - abandoned == 1: ' . ($result['abandoned'] == 1 ? 'yes' : 'no'));
+    }
+
+    // Try different condition checks
+    $condition1 = $result && isset($result['abandoned']) && $result['abandoned'];
+    $condition2 = isset($result['abandoned']) && $result['abandoned'] === true;
+    $condition3 = isset($result['abandoned']) && $result['abandoned'] == 1;
+
+    error_log('SCR: DEBUG - condition1 (original): ' . ($condition1 ? 'true' : 'false'));
+    error_log('SCR: DEBUG - condition2 (=== true): ' . ($condition2 ? 'true' : 'false'));
+    error_log('SCR: DEBUG - condition3 (== 1): ' . ($condition3 ? 'true' : 'false'));
+
+    if ($condition1 || $condition2 || $condition3) {
         error_log('SCR: Cart abandoned, calling email API');
 
         // Check if email already sent for this user recently (prevent spam but allow testing)

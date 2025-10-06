@@ -31,7 +31,8 @@ async def startup_event():
         recommendation_engine.load_products()
         logging.info("Email generator service started successfully")
     except Exception as e:
-        logging.error(f"Failed to initialize recommendation engine: {e}")
+        logging.warning(f"Failed to initialize recommendation engine: {e}. Will use fallback recommendations.")
+        # Don't fail startup - the service can still work with fallback recommendations
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != os.getenv("API_TOKEN"):
@@ -120,10 +121,11 @@ def send_email(to_email: str, subject: str, body: str):
         server.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"))
         server.sendmail(msg['From'], to_email, msg.as_string())
         server.quit()
-        print(f"Email sent successfully to {to_email}")
+        logging.info(f"Email sent successfully to {to_email}")
+        return True
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
-        # Don't raise exception - just log the error for now
+        logging.error(f"Failed to send email to {to_email}: {e}")
+        return False
 
 @app.get("/track-open")
 def track_open(user_id: str, email: str):

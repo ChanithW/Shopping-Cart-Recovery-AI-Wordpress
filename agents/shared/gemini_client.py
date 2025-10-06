@@ -21,7 +21,7 @@ class PersonalizedEmailGenerator:
     
     def __init__(self):
         configure_gemini()
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-pro')
     
     def determine_customer_persona(self, cart_items: List[Dict], behavior: Dict) -> str:
         """Determine customer persona based on cart contents and behavior."""
