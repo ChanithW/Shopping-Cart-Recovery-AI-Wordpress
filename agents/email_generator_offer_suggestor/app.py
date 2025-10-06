@@ -19,19 +19,28 @@ app = FastAPI(title="Email Generator & Offer Suggestor Agent")
 security = HTTPBearer()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
-# Initialize enhanced components
-email_generator = PersonalizedEmailGenerator()
-offer_calculator = OfferCalculator()
-recommendation_engine = ProductRecommendationEngine()
+# Initialize enhanced components (moved to startup event to avoid global init issues)
+email_generator = None
+offer_calculator = None
+recommendation_engine = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize components on startup."""
+    global email_generator, offer_calculator, recommendation_engine
+    
     try:
-        recommendation_engine.load_products()
-        logging.info("Email generator service started successfully")
+        print("Initializing email generator...")
+        
+        # Initialize components
+        email_generator = PersonalizedEmailGenerator()
+        offer_calculator = OfferCalculator()
+        recommendation_engine = ProductRecommendationEngine()
+        
+        products = recommendation_engine.load_products()
+        print(f"Email generator service started successfully - loaded {len(products)} products")
     except Exception as e:
-        logging.warning(f"Failed to initialize recommendation engine: {e}. Will use fallback recommendations.")
+        print(f"Warning: Failed to initialize recommendation engine: {e}. Service will continue with limited functionality.")
         # Don't fail startup - the service can still work with fallback recommendations
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -42,6 +51,10 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 def generate_email(data: EmailData, token: str = Depends(verify_token)):
     """Generate personalized recovery email with dynamic offers and recommendations."""
     try:
+        # Check if components are initialized
+        if not all([email_generator, offer_calculator, recommendation_engine]):
+            raise Exception("Service components not properly initialized")
+        
         # Calculate dynamic offers based on cart value
         offer_details = offer_calculator.generate_offer_details(data.items)
         
@@ -82,7 +95,15 @@ def generate_email(data: EmailData, token: str = Depends(verify_token)):
         
         # Optionally send email if configured
         if os.getenv("SEND_EMAIL_DIRECTLY", "false").lower() == "true":
-            send_email(data.email, subject, body)
+            try:
+                email_sent = send_email(data.email, subject, body)
+                if email_sent:
+                    logging.info(f"Recovery email sent successfully to {data.email}")
+                else:
+                    logging.warning(f"Failed to send recovery email to {data.email}")
+            except Exception as e:
+                logging.error(f"Error sending email to {data.email}: {e}")
+                # Don't fail the request if email sending fails
         
         return GeneratedEmail(
             subject=subject, 
@@ -97,15 +118,59 @@ def generate_email(data: EmailData, token: str = Depends(verify_token)):
         )
         
     except Exception as e:
-        logging.error(f"Error generating email: {str(e)}")
-        # Fallback to basic email
+        error_msg = str(e)
+        logging.error(f"Error generating email: {error_msg}")
+        
+        # Check if it's a quota issue
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+            logging.warning("Gemini API quota exceeded - using enhanced fallback template")
+        
+        # Enhanced fallback with basic recommendations
+        try:
+            basic_recommendations = recommendation_engine.find_similar_products(data.items, top_n=3) if recommendation_engine else []
+        except:
+            basic_recommendations = []
+        
+        # Create a more comprehensive fallback email
+        cart_items_text = ", ".join([item.get('name', 'item') for item in data.items])
+        fallback_subject = f"Complete Your Purchase - {cart_items_text}"
+        
+        recommendations_html = ""
+        if basic_recommendations:
+            recommendations_html = "<h3>You might also like:</h3><ul>" + "".join([f"<li>{rec.get('item_name', 'Product')}</li>" for rec in basic_recommendations[:3]]) + "</ul>"
+        
+        fallback_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2>Hello {data.name or 'Valued Customer'}!</h2>
+            <p>We noticed you were interested in: <strong>{cart_items_text}</strong></p>
+            <p>Don't miss out on completing your purchase! We have some great offers waiting for you.</p>
+            
+            <div style="background-color: #f0f8ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3>🎁 Special Offer: Free Shipping!</h3>
+                <p>Get free shipping on your order when you complete your purchase today.</p>
+            </div>
+            
+            {recommendations_html}
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="#" style="background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Complete Your Purchase Now
+                </a>
+            </div>
+            
+            <p style="color: #666; font-size: 12px;">This email was sent because you have items in your shopping cart.</p>
+        </body>
+        </html>
+        """
+        
         return GeneratedEmail(
-            subject="Complete Your Purchase - Special Offer!",
-            body="<p>We noticed you left some items in your cart. Complete your purchase today!</p>",
+            subject=fallback_subject,
+            body=fallback_body,
             offers=[Offer(type="shipping", value="free", description="Free shipping on all orders")],
-            recommendations=[],
+            recommendations=[f"{rec.get('item_name', 'Product')} - ${rec.get('price', 0):.2f}" for rec in basic_recommendations[:3]],
             total_savings=0.0,
-            final_amount=0.0
+            final_amount=sum(item.get('price', 0) * item.get('quantity', 1) for item in data.items)
         )
 
 def send_email(to_email: str, subject: str, body: str):

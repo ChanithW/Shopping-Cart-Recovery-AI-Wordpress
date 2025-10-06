@@ -21,7 +21,7 @@ class PersonalizedEmailGenerator:
     
     def __init__(self):
         configure_gemini()
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
     
     def determine_customer_persona(self, cart_items: List[Dict], behavior: Dict) -> str:
         """Determine customer persona based on cart contents and behavior."""
@@ -149,8 +149,14 @@ class PersonalizedEmailGenerator:
             return {"subject": subject, "body": body}
             
         except Exception as e:
-            print(f"Error generating email content: {e}")
-            return self._create_fallback_email(greeting, cart_items, recommendations, offer_details)
+            error_str = str(e).lower()
+            # Check for quota/rate limit errors
+            if "429" in str(e) or "quota" in error_str or "rate limit" in error_str:
+                print(f"Gemini API quota exceeded - using fallback template")
+                return self._create_fallback_email(greeting, cart_items, recommendations, offer_details)
+            else:
+                print(f"Error generating email content: {e}")
+                return self._create_fallback_email(greeting, cart_items, recommendations, offer_details)
     
     def _create_fallback_html(self, greeting: str, cart_items: List[Dict], 
                              recommendations: List[Dict], offer_details: Dict) -> str:

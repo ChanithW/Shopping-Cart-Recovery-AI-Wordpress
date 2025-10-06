@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict, Any, Tuple
 import logging
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from .db import Product, get_db_session
 
@@ -22,34 +23,69 @@ class ProductRecommendationEngine:
         self.logger = logging.getLogger(__name__)
         
     def load_products(self, db_session: Session = None):
-        """Load products from database and prepare TF-IDF vectors."""
+        """Load products from WooCommerce wp_posts table and prepare TF-IDF vectors."""
         if db_session is None:
             db_session = get_db_session()
-        
+
         try:
-            # Fetch all products that are in stock
-            products = db_session.query(Product).filter(
-                Product.stock_status == 'in_stock',
-                Product.stock_quantity > 0
-            ).all()
-            
+            # Query WooCommerce products from wp_posts with metadata
+            # Get products that are published and of type 'product'
+            products_query = db_session.execute(text("""
+                SELECT
+                    p.ID as id,
+                    p.post_title as item_name,
+                    p.post_content as description,
+                    COALESCE(pm_price.meta_value, '0') as price,
+                    COALESCE(pm_regular.meta_value, pm_price.meta_value, '0') as regular_price,
+                    GROUP_CONCAT(DISTINCT t.name) as categories
+                FROM wp_posts p
+                LEFT JOIN wp_postmeta pm_price ON p.ID = pm_price.post_id AND pm_price.meta_key = '_price'
+                LEFT JOIN wp_postmeta pm_regular ON p.ID = pm_regular.post_id AND pm_regular.meta_key = '_regular_price'
+                LEFT JOIN wp_term_relationships tr ON p.ID = tr.object_id
+                LEFT JOIN wp_term_taxonomy tt ON tr.term_taxonomy_id = tt.term_taxonomy_id AND tt.taxonomy = 'product_cat'
+                LEFT JOIN wp_terms t ON tt.term_id = t.term_id
+                WHERE p.post_type = 'product'
+                AND p.post_status = 'publish'
+                AND COALESCE(pm_price.meta_value, '0') != '0'
+                GROUP BY p.ID, p.post_title, p.post_content, pm_price.meta_value, pm_regular.meta_value
+                ORDER BY p.ID
+            """))
+
+            products_data = products_query.fetchall()
+
             self.products = []
             self.product_texts = []
-            
-            for product in products:
+
+            for product_data in products_data:
+                product_id, name, description, price, regular_price, categories = product_data
+
+                # Clean up HTML from description
+                if description:
+                    import re
+                    # Remove HTML tags
+                    description = re.sub(r'<[^>]+>', '', description)
+                    # Clean up extra whitespace
+                    description = ' '.join(description.split())
+
+                # Use regular price if available and different from sale price
+                final_price = regular_price if regular_price and regular_price != price else price
+                # Clean price by removing currency symbols
+                if final_price:
+                    final_price = str(final_price).replace('$', '').replace(',', '').strip()
+
                 self.products.append({
-                    'id': product.id,
-                    'item_name': product.item_name,
-                    'description': product.description,
-                    'price': float(product.price),
-                    'category': product.category,
-                    'stock_quantity': product.stock_quantity
+                    'id': product_id,
+                    'item_name': name or f'Product {product_id}',
+                    'description': description or f'{name} - Product description',
+                    'price': float(final_price) if final_price else 0.0,
+                    'category': categories or 'General',
+                    'stock_quantity': 10  # Default stock since not easily available
                 })
-                
+
                 # Combine name and description for TF-IDF
-                combined_text = f"{product.item_name} {product.description}"
+                combined_text = f"{name} {description} {categories}".strip()
                 self.product_texts.append(combined_text)
-            
+
             # Create TF-IDF vectors
             if self.product_texts:
                 self.vectorizer = TfidfVectorizer(
@@ -60,13 +96,18 @@ class ProductRecommendationEngine:
                     max_df=0.95
                 )
                 self.tfidf_matrix = self.vectorizer.fit_transform(self.product_texts)
-                self.logger.info(f"Loaded {len(self.products)} products for recommendations")
-            
+
+            self.logger.info(f"Loaded {len(self.products)} WooCommerce products from wp_posts")
+
         except Exception as e:
-            self.logger.error(f"Error loading products: {str(e)}")
-            raise
+            self.logger.error(f"Error loading products from wp_posts: {e}")
+            # Fallback to empty lists
+            self.products = []
+            self.product_texts = []
         finally:
             db_session.close()
+        
+        return self.products
     
     def preprocess_cart_items(self, cart_items: List[Dict[str, Any]]) -> List[str]:
         """Extract and preprocess text from cart items."""

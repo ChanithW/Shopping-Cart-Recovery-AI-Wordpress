@@ -27,17 +27,14 @@ class CartLog(Base):
     converted = Column(Integer, default=0)
 
 class Product(Base):
-    __tablename__ = 'products'
-    
-    id = Column(Integer, primary_key=True)
-    item_name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=False)
-    price = Column(DECIMAL(10, 2), nullable=False)
-    category = Column(String(100), nullable=False)
-    stock_status = Column(Enum('in_stock', 'out_of_stock'), default='in_stock')
-    stock_quantity = Column(Integer, default=0)
-    created_at = Column(DateTime)
-    updated_at = Column(DateTime)
+    __tablename__ = 'wp_posts'
+    __table_args__ = {'extend_existing': True}
+
+    # Map WordPress post fields to our Product model
+    id = Column('ID', Integer, primary_key=True)
+    item_name = Column('post_title', String(255))
+    # We'll need to get description and price from postmeta, not direct columns
+    # These will be populated in the recommendation engine
 
 def get_db_session():
     return SessionLocal()

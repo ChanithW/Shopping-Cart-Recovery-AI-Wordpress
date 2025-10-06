@@ -11,26 +11,41 @@ import os
 app = FastAPI(title="Abandonment Detector Agent")
 security = HTTPBearer()
 
-# Simple auth check (replace with proper JWT) - made optional for WordPress integration
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if credentials and credentials.credentials != os.getenv("API_TOKEN"):
-        raise HTTPException(status_code=401, detail="Invalid token")
+@app.on_event("startup")
+async def startup_event():
+    """Initialize components on startup."""
+    print("Starting abandonment detector...")
+    try:
+        # Test database connection
+        from .models import CartData
+        print("Database connection test passed")
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        # Don't fail startup
 
 @app.post("/detect-abandonment", response_model=AbandonmentResponse)
 def detect_abandonment(data: CartData):
-    # Check if abandoned: e.g., idle time > 1 minute and no checkout
-    idle_threshold = 60  # 1 minute (60 seconds)
+    # Check if abandoned: e.g., idle time > threshold and no checkout
+    idle_threshold = int(os.getenv("ABANDONMENT_THRESHOLD_SECONDS", "60"))  # Default 1 minute (60 seconds)
     if data.behavior.idle_time > idle_threshold:
         # Fetch product details and recommendations using TF-IDF engine
         try:
             rec_engine = ProductRecommendationEngine()
-            recommendations = rec_engine.get_recommendations_for_cart([
+            tfidf_recommendations = rec_engine.find_similar_products([
                 {
                     'name': item.name, 
-                    'description': item.description, 
-                    'category': item.category
+                    'description': f"{item.name} - Product ID: {item.product_id}", 
+                    'category': 'Electronics',  # Default category since not in model
+                    'product_id': item.product_id
                 } for item in data.items
-            ])
+            ], top_n=3)
+            
+            # Format recommendations for API response
+            recommendations = [
+                {"name": rec["item_name"], "price": float(rec["price"])}
+                for rec in tfidf_recommendations
+            ]
+            
         except Exception as e:
             print(f"Error getting recommendations: {e}")
             recommendations = [{"name": "Similar Product", "price": 50.0}]
@@ -50,7 +65,7 @@ def detect_abandonment(data: CartData):
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "abandonment-detector", "port": 8005}
+    return {"status": "healthy", "service": "abandonment-detector", "port": 8006}
 
 @app.get("/")
 def root():
@@ -59,4 +74,4 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8005)
+    uvicorn.run(app, host="0.0.0.0", port=8006)
